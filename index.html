@@ -189,6 +189,8 @@
                     <option value="Dining">🍽️ Dining & Bars</option>
                     <option value="Transport">🚘 Transport</option>
                     <option value="Shopping">🛍️ Shopping</option>
+                    <option value="Housing">🏠 Housing & Utilities</option>
+                    <option value="Subscriptions">📺 Subscriptions</option>
                     <option value="Salary">💰 Salary / Income</option>
                     <option value="Other">📦 Other</option>
                 </select>
@@ -274,7 +276,7 @@
 
         if (!title || isNaN(amount)) return;
 
-        txns.unshift({ id: Date.now(), title, amount, category, type, date: new Date().toLocaleDateString('it-IT') });
+        txns.unshift({ id: Date.now(), title, amount, category, type, date: new Date().toLocaleDateString('it-IT'), isBill: false });
         
         document.getElementById('txnTitle').value = '';
         document.getElementById('txnAmount').value = '';
@@ -282,6 +284,14 @@
     }
 
     function deleteTxn(id) {
+        const txn = txns.find(t => t.id === id);
+        // If it's linked to a bill, unmark the bill as paid instead of just deleting
+        if (txn && txn.isBill && txn.billId) {
+            bills = bills.map(b => {
+                if (b.id === txn.billId) b.status = 'pending';
+                return b;
+            });
+        }
         txns = txns.filter(t => t.id !== id);
         saveAndRender();
     }
@@ -305,7 +315,24 @@
     function toggleBillStatus(id) {
         bills = bills.map(b => {
             if (b.id === id) {
-                b.status = b.status === 'pending' ? 'paid' : 'pending';
+                if (b.status === 'pending') {
+                    b.status = 'paid';
+                    // Automatically add to transactions list as an expense
+                    txns.unshift({
+                        id: Date.now(),
+                        billId: b.id,
+                        title: `${b.title} (${frequencyLabels[b.frequency]})`,
+                        amount: b.amount,
+                        category: b.category,
+                        type: 'expense',
+                        date: new Date().toLocaleDateString('it-IT'),
+                        isBill: true
+                    });
+                } else {
+                    b.status = 'pending';
+                    // Remove corresponding auto-generated expense from transactions
+                    txns = txns.filter(t => t.billId !== id);
+                }
             }
             return b;
         });
@@ -313,6 +340,8 @@
     }
 
     function deleteBill(id) {
+        // Also remove any linked paid transaction
+        txns = txns.filter(t => t.billId !== id);
         bills = bills.filter(b => b.id !== id);
         saveAndRender();
     }
@@ -356,7 +385,6 @@
         let income = txns.filter(t => t.type === 'income').reduce((acc, t) => acc + t.amount, 0);
         let expenses = txns.filter(t => t.type === 'expense').reduce((acc, t) => acc + t.amount, 0);
         
-        // Calculate monthly fixed baseline across all frequencies
         let pendingBillsMonthlyEquiv = bills
             .filter(b => b.status === 'pending')
             .reduce((acc, b) => acc + getMonthlyEquivalent(b.amount, b.frequency), 0);
