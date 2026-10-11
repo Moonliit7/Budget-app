@@ -1,0 +1,9 @@
+{
+  "name": "Budget Tracker",
+  "short_name": "Budget",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#f2f2f7",
+  "theme_color": "#007aff",
+  "icons": []
+}
